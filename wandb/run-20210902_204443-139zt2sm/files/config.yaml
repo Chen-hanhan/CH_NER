@@ -1,0 +1,52 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.12.1
+    framework: huggingface
+    huggingface_version: 4.5.0
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    python_version: 3.7.0
+    start_time: 1630586684
+    t:
+      1:
+      - 1
+      - 5
+      - 11
+      2:
+      - 1
+      - 5
+      - 11
+      3:
+      - 2
+      4: 3.7.0
+      5: 0.12.1
+      6: 4.5.0
+      8:
+      - 5
+architecture:
+  desc: null
+  value: Bert+CRF
+bert_learning_rate:
+  desc: null
+  value: 2.0e-05
+dataset:
+  desc: null
+  value: 3195-train,791-dev
+dropout_prob:
+  desc: null
+  value: 0.1
+epoch:
+  desc: null
+  value: 5
+other_learning_rate:
+  desc: null
+  value: 0.002
+train_batch_size:
+  desc: null
+  value: 64
+version:
+  desc: null
+  value: '1'

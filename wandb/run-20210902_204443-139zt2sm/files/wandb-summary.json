@@ -1,0 +1,1 @@
+{"loss": 3.48663330078125, "_runtime": 263, "_timestamp": 1630586947, "_step": 255, "avg_loss": 0.0, "f1": 0.5763363300995805, "precision": "[", "recall": "M", "_wandb": {"runtime": 267}}
