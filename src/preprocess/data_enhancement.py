@@ -140,15 +140,15 @@ def data_enhancement(train_dir):
                         
             replaced_sents.append(ner_sent)
             replaced_labels.append(ner_label)
-            if type in ['期象', '累及部位', '病理分级', '病理分型', '病理分期']:
-                eda_sent, eda_labels = data_enhancence_eda(ner_sent, ner_label)
+            # if type in ['期象', '累及部位', '病理分级', '病理分型', '病理分期']:
+            #     eda_sent, eda_labels = data_enhancence_eda(ner_sent, ner_label)
     return replaced_sents, replaced_labels
 # 随机选择句子进行实体替换
 # from nlpcda import Similarword             
-def data_enhancence_eda(train_dir):
-    train_sent, train_ner_label = get_example_sent_ner(train_dir)   
+# def data_enhancence_eda(train_dir):
+#     train_sent, train_ner_label = get_example_sent_ner(train_dir)   
     
 
-train_dir = '/public/ch/project/CH_Entity_Recognize/data/raw_data/train.conll'              
-replaced_sents, replaced_labels = data_enhancement(train_dir)
-print()
+# train_dir = '/public/ch/project/CH_Entity_Recognize/data/raw_data/train.conll'              
+# replaced_sents, replaced_labels = data_enhancement(train_dir)
+# print()

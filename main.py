@@ -71,7 +71,8 @@ def train_base(opt, train_examples, dev_examples):
                                                     ckpt_path=model_path)
         
             if opt.task_type == 'crf':
-                tmp_metric_str, tmp_f1 = crf_evaluation(model, dev_info, device, ent2id)
+                #TODO: tmp_metric_str返回为str，改为返回long
+                tmp_metric_str, tmp_f1, tmp_recall, tmp_precision = crf_evaluation(model, dev_info, device, ent2id)
             else:
                 pass
             
@@ -79,7 +80,7 @@ def train_base(opt, train_examples, dev_examples):
 
             metric_str += f'In step {tmp_step}:\n {tmp_metric_str}' + '\n\n'
 
-            wandb.log({"f1":tmp_f1, 'precision': tmp_metric_str[0], 'recall': tmp_metric_str[1]})
+            wandb.log({"f1":tmp_f1, 'precision': tmp_precision, 'recall': tmp_recall})
             
             if tmp_f1 > max_f1:
                 max_f1 = tmp_f1

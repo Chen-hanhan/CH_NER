@@ -38,72 +38,91 @@ def crf_decode(decode_tokens, raw_text, id2ent):
 
         token_label = id2ent[decode_tokens[index_]].split('-')
         #TODO:修改为BIO标注
-        # BIOES
-        # if token_label[0].startswith('S'):
-        #     token_type = token_label[1]
-        #     tmp_ent = raw_text[index_]
-
-        #     if token_type not in predict_entities:
-        #         predict_entities[token_type] = [(tmp_ent, index_)]
-        #     else:
-        #         predict_entities[token_type].append((tmp_ent, int(index_)))
-
-        #     index_ += 1
-
-        # elif token_label[0].startswith('B'):
-        #     token_type = token_label[1]
-        #     start_index = index_
-            
-        #     index_ += 1
-        #     while index_ < len(decode_tokens):
-        #         temp_token_label = id2ent[decode_tokens[index_]].split('-')
-
-        #         if temp_token_label[0].startswith('I') and token_type == temp_token_label[1]:
-        #             index_ += 1
-        #         elif temp_token_label[0].startswith('E') and token_type == temp_token_label[1]:
-        #             end_index = index_
-        #             index_ += 1
-
-        #             tmp_ent = raw_text[start_index: end_index + 1]
-
-        #             if token_type not in predict_entities:
-        #                 predict_entities[token_type] = [(tmp_ent, start_index)]
-        #             else:
-        #                 predict_entities[token_type].append((tmp_ent, int(start_index)))
-
-        #             break
-        #         else:
-        #             break
-        # else:
-        #     index_ += 1
-        
-        # BIO
-        if token_label[0].startswith('B'):
-            token_type = token_label[1]
-            start_index = index_
-            
-            index_ += 1
-            while index_ < len(decode_tokens):
+        BIAO_ZHU = 'BIOES' # 选择标注方法
+        # BIO标注
+        if BIAO_ZHU == 'BIOES':
+            # BIOES
+            if token_label[0].startswith('S'):
                 temp_token_label = id2ent[decode_tokens[index_]].split('-')
+                # start_index = index_
+                token_type = token_label[1]
+                
+                tmp_ent = raw_text[index_]
 
-                if temp_token_label[0].startswith('I') and token_type == temp_token_label[1]:
-                    index_ += 1 
-                    # 判断下一个token是否还是当前实体:当前token标签不等于下一token标签 or 下一token标签为0
-                    if index_<len(decode_tokens):
-                    
-                        if (decode_tokens[index_-1] != decode_tokens[index_]) or  (decode_tokens[index_] == 0):
-                            # 标签范围左闭右开
+                if token_type not in predict_entities:
+                    predict_entities[token_type] = [(tmp_ent, index_)]
+                else:
+                    predict_entities[token_type].append((tmp_ent, int(index_)))
+
+                index_ += 1
+
+            elif token_label[0].startswith('B'):
+                token_type = token_label[1]
+                start_index = index_
+                
+                index_ += 1
+                while index_ < len(decode_tokens):
+                    temp_token_label = id2ent[decode_tokens[index_]].split('-')
+
+                    if temp_token_label[0].startswith('I') and token_type == temp_token_label[1]:
+                        index_ += 1
+                    elif temp_token_label[0].startswith('E') and token_type == temp_token_label[1]:
+                        end_index = index_
+                        index_ += 1
+
+                        tmp_ent = raw_text[start_index: end_index + 1]
+
+                        if token_type not in predict_entities:
+                            predict_entities[token_type] = [(tmp_ent, start_index)]
+                        else:
+                            predict_entities[token_type].append((tmp_ent, int(start_index)))
+
+                        break
+                    else:
+                        break
+            else:
+                index_ += 1
+                
+        elif BIAO_ZHU == 'BIO':  
+            # BIO
+            if token_label[0].startswith('B'):
+                token_type = token_label[1]
+                start_index = index_
+                
+                index_ += 1
+                while index_ < len(decode_tokens):
+                    temp_token_label = id2ent[decode_tokens[index_]].split('-')
+
+                    if temp_token_label[0].startswith('I') and token_type == temp_token_label[1]:
+                        index_ += 1 
+                        # 判断下一个token是否还是当前实体:当前token标签不等于下一token标签 or 下一token标签为0
+                        if index_<len(decode_tokens):
+                        
+                            if (decode_tokens[index_-1] != decode_tokens[index_]) or  (decode_tokens[index_] == 0):
+                                # 标签范围左闭右开
+                                end_index = index_
+                                
+                                tmp_ent = raw_text[start_index: end_index]
+                                if token_type not in predict_entities:
+                                    predict_entities[token_type] = [(tmp_ent, start_index)]
+                                else:
+                                    predict_entities[token_type].append((tmp_ent, int(start_index)))
+
+                                break
+                        # 若为最后一个token了，则该token为end
+                        else: 
                             end_index = index_
-                            
                             tmp_ent = raw_text[start_index: end_index]
+                            
                             if token_type not in predict_entities:
                                 predict_entities[token_type] = [(tmp_ent, start_index)]
                             else:
                                 predict_entities[token_type].append((tmp_ent, int(start_index)))
 
                             break
-                    # 若为最后一个token了，则该token为end
-                    else: 
+                    # 如果B-后为o或者另外的实体类别
+                    else:
+                        # index_ += 1
                         end_index = index_
                         tmp_ent = raw_text[start_index: end_index]
                         
@@ -113,18 +132,6 @@ def crf_decode(decode_tokens, raw_text, id2ent):
                             predict_entities[token_type].append((tmp_ent, int(start_index)))
 
                         break
-                # 如果B-后为o或者另外的实体类别
-                else:
-                    # index_ += 1
-                    end_index = index_
-                    tmp_ent = raw_text[start_index: end_index]
-                    
-                    if token_type not in predict_entities:
-                        predict_entities[token_type] = [(tmp_ent, start_index)]
-                    else:
-                        predict_entities[token_type].append((tmp_ent, int(start_index)))
-
-                    break
         else:
             index_ += 1
                     
@@ -200,7 +207,7 @@ def crf_evaluation(model, dev_info, device, ent2id):
     metric_str = f'[MIRCO] precision: {mirco_metrics[0]:.4f}, ' \
                  f'recall: {mirco_metrics[1]:.4f}, f1: {mirco_metrics[2]:.4f}'
 
-    return metric_str, mirco_metrics[2]
+    return metric_str, mirco_metrics[2], mirco_metrics[1], mirco_metrics[1] # f1, recall, precision 
 
     
 
