@@ -13,6 +13,7 @@ from src.utils.dataset_utils import NERDataset
 from src.utils.evaluator import crf_evaluation
 from src.utils.functions_utils import set_seed, get_model_path_list, load_model_and_parallel, get_time_dif
 from src.preprocess.processor import NERProcessor, convert_examples_to_features
+from src.preprocess.data_enhancement import data_enhancement
 import wandb
 
 logger = logging.getLogger(__name__)
@@ -119,7 +120,10 @@ def training(opt):
         processor = NERProcessor(opt.max_seq_len)
 
     train_raw_text, train_raw_labels = processor.read_data(os.path.join(opt.raw_data_dir, 'train.conll'))
-
+    # 数据增强
+    train_enhance_text, train_enhance_labels = data_enhancement(os.path.join(opt.raw_data_dir, 'train.conll'))
+    train_raw_text += train_enhance_text
+    train_raw_labels += train_enhance_labels
     train_examples = processor.get_example(raw_text=train_raw_text, 
                                            raw_labels=train_raw_labels,
                                            set_type='train')
