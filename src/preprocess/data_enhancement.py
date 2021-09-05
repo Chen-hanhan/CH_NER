@@ -1,6 +1,7 @@
 import re
 import numpy as np
 import random
+import string
 
 ENTITY_TYPES = ['指代', '手术','期象', '累及部位', '病理分级', '病理分型', '病理分期']
 ENTITY_TYPES_PY = ['zhidai', 'shoushu', 'qixiang', 'leijibuwei', 'binglifen_ji', 'binglifen_xing', 'binglifen_qi']
@@ -141,13 +142,100 @@ def data_enhancement(train_dir):
             replaced_sents.append(ner_sent)
             replaced_labels.append(ner_label)
             # if type in ['期象', '累及部位', '病理分级', '病理分型', '病理分期']:
-            #     eda_sent, eda_labels = data_enhancence_eda(ner_sent, ner_label)
+            #     # print()
+            #     eda_sent = data_enhancence_eda(ner_sent, ner_label)
+            #     replaced_sents.append(eda_sent)
+            #     replaced_labels.append(ner_label)
     return replaced_sents, replaced_labels
+
+
+
 # 随机选择句子进行实体替换
-# from nlpcda import Similarword             
-# def data_enhancence_eda(train_dir):
-#     train_sent, train_ner_label = get_example_sent_ner(train_dir)   
+from nlpcda import Similarword, Homophone  
+smw = Similarword(create_num=2, change_rate=0.5)# 同义词
+smw_hp = Homophone(create_num=2, change_rate=0.3)# 近义词 
+# 同义词 近义词替换     
+def data_enhancence_eda(ner_sent, ner_label):
+ 
+
+    # for _label_idx, _label in enumerate(ner_label):
+    label_idx = 0
+    eda_sent = ''
+    while label_idx < (len(ner_label)-1):
+        if label_idx == 0:# 第一个实体
+            text0 = ner_sent[: ner_label[label_idx][0]]
+            if text0:
+                tmp_text0 = smw.replace(text0)# 返回列表
+                
+                if len(tmp_text0) < 2:
+                    tmp_text0 = tmp_text0[0]
+                else:
+                    tmp_text0 = tmp_text0[1]
+                
+                # 如果相等就取近义词
+                if tmp_text0 == text0:
+                    if len(tmp_text0) < 2:
+                        tmp_text0 = tmp_text0[0]
+                    else:
+                        tmp_text0 = tmp_text0[1]
+                # 如果长度不等则进行处理
+                while len(tmp_text0) != len(text0):
+                    # 长了则随机删除
+                    if len(tmp_text0) > len(text0):
+                        
+                        text0_gap = len(tmp_text0) - len(text0)
+                        for _ in range(text0_gap):
+                            tmp_text0 = tmp_text0.replace(random.choice(tmp_text0), '', 1)
+                    
+                    else:
+                        tmp_text0 = text0
+                    
+                eda_sent += tmp_text0
+        
+        text1 = ner_sent[ner_label[label_idx][1]: ner_label[label_idx+1][0]]
+        if text1:
+            tmp_text1 = smw.replace(text1)# 太短的情况下有可能返回一个
+            if len(tmp_text1) < 2:
+                tmp_text1 = tmp_text1[0]
+                
+            else:
+                tmp_text1 = tmp_text1[1]
+            # 如果相等就取近义词 # 如果为标点符号
+            if tmp_text1 == text1:
+                tmp_text1 = smw_hp.replace(tmp_text1)
+                if len(tmp_text1) < 2:
+                    tmp_text1 = tmp_text1[0]
+                else:
+                    tmp_text1 = tmp_text1[1]
+                
+            while len(tmp_text1) != len(text1):
+                # 长了则随机删除
+                if len(tmp_text1) > len(text1):
+                    
+                    text1_gap = len(tmp_text1) - len(text1)
+                    for _ in range(text1_gap):
+                        tmp_text1 = tmp_text1.replace(random.choice(tmp_text1), '', 1)
+                
+                else:
+                    tmp_text1 = text1
+                    
+            eda_sent += (ner_label[label_idx][3] + tmp_text1)
+                
+        else:
+            eda_sent += ner_label[label_idx][3]         
+            
+        if (label_idx+2) == len(ner_label):
+            eda_sent += ner_label[label_idx+1][3]   
+                
+        assert eda_sent[ner_label[label_idx][0]: ner_label[label_idx][1]] == ner_label[label_idx][3]  
+        label_idx += 1
+
     
+    
+    return eda_sent
+    
+
+
 
 # train_dir = '/public/ch/project/CH_Entity_Recognize/data/raw_data/train.conll'              
 # replaced_sents, replaced_labels = data_enhancement(train_dir)
