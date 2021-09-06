@@ -122,30 +122,39 @@ def convert_crf_example(ex_idx, example: InputExample, max_seq_len,
     if set_type == 'train':
         # information for dev callback
         label_ids = [0] * len(tokens)
-
+        BIAO_ZHU = 'BIOES' # 选择标注方法
         # BIO标注
-        for ent in entities:
-            start_idx = ent[0]
-            end_idx = ent[1]-1
-            ent_type = ent[2]
-            entity = ent[3]
-            assert (start_idx + len(entity)-1) == end_idx
-            # BIO
-            if start_idx == end_idx:
-                label_ids[start_idx] = ent2id['B-' + ent_type]
-            else:
-                label_ids[start_idx] = ent2id['B-' + ent_type]
-                for i in range(start_idx+1, end_idx+1):
-                    label_ids[i] = ent2id['I-' + ent_type]
-
-            # # BIOES
-            # if start_idx == end_idx:
-            #     label_ids[start_idx] = ent2id['S' + ent_type]
-            # else:
-            #     label_ids[start_idx] = ent2id['B-' + ent_type]
-            #     label_ids[end_idx] = ent2id['E-' + ent_type]
-            #     for i in range(start_idx+1, end_idx):
-            #         label_ids[i] = ent2id['I-' + ent_type]
+        if BIAO_ZHU == 'BIO':
+            for ent in entities:
+                start_idx = ent[0]
+                end_idx = ent[1] - 1
+                ent_type = ent[2]
+                entity = ent[3]
+                assert (start_idx + len(entity)-1) == end_idx
+                # BIO
+                if start_idx == end_idx:
+                    label_ids[start_idx] = ent2id['B-' + ent_type]
+                else:
+                    label_ids[start_idx] = ent2id['B-' + ent_type]
+                    for i in range(start_idx+1, end_idx+1):
+                        label_ids[i] = ent2id['I-' + ent_type]
+        elif BIAO_ZHU == 'BIOES':
+            # BIOES
+            for ent in entities:
+                
+                start_idx = ent[0]
+                end_idx = ent[1] - 1
+                ent_type = ent[2]
+                entity = ent[3]
+                assert (start_idx + len(entity)-1) == end_idx
+                
+                if start_idx == end_idx:
+                    label_ids[start_idx] = ent2id['S-' + ent_type]
+                else:
+                    label_ids[start_idx] = ent2id['B-' + ent_type]
+                    label_ids[end_idx] = ent2id['E-' + ent_type]
+                    for i in range(start_idx+1, end_idx):
+                        label_ids[i] = ent2id['I-' + ent_type]
 
         # cls
         if len(label_ids) > max_seq_len - 2:

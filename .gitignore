@@ -112,3 +112,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+*.txt
+结果记录.md

@@ -71,7 +71,8 @@ def train_base(opt, train_examples, dev_examples):
                                                     ckpt_path=model_path)
         
             if opt.task_type == 'crf':
-                tmp_metric_str, tmp_f1 = crf_evaluation(model, dev_info, device, ent2id)
+                #TODO: tmp_metric_str返回为str，改为返回long
+                tmp_metric_str, tmp_f1, tmp_recall, tmp_precision = crf_evaluation(model, dev_info, device, ent2id)
             else:
                 pass
             
@@ -79,8 +80,10 @@ def train_base(opt, train_examples, dev_examples):
 
             metric_str += f'In step {tmp_step}:\n {tmp_metric_str}' + '\n\n'
 
-            wandb.log({"f1":tmp_f1, 'precision': tmp_metric_str[0], 'recall': tmp_metric_str[1]})
-            
+            # wandb.log({"f1":tmp_f1, 'precision': tmp_precision, 'recall': tmp_recall})
+            wandb.log({"f1":tmp_f1})
+            wandb.log({'precision': tmp_precision})
+            wandb.log({'recall': tmp_recall})
             if tmp_f1 > max_f1:
                 max_f1 = tmp_f1
                 max_f1_step = tmp_step
@@ -110,7 +113,7 @@ def train_base(opt, train_examples, dev_examples):
             shutil.rmtree(x)
             logger.info('{}已删除'.format(x))
         
-        wandb.finish()
+        
     
         
         
@@ -136,12 +139,51 @@ def training(opt):
         dev_raw_labels.append(example.labels)
     assert len(dev_raw_text) == len(dev_raw_labels)
     dev_examples = processor.get_example(dev_raw_text, dev_raw_labels, 'dev')
-    # dev_examples = None
-    # if opt.eval_model:
-    #     dev_raw_text, dev_raw_labels = processor.read_data(os.path.join(opt.raw_data_dir, 'dev.conll'))
-    #     dev_examples = processor.get_example(dev_raw_text, dev_raw_labels, 'dev')
+    
 
     train_base(opt, train_examples, dev_examples)
+
+
+# K折验证
+def stacking(opt):
+    logger.info('Start to KFold stack attribution model')
+
+    if args.task_type == 'mrc':
+        # 62 for mrc query
+        processor = NERProcessor(opt.max_seq_len-62)
+    else:
+        processor = NERProcessor(opt.max_seq_len)
+
+    kf = KFold(5, shuffle=True, random_state=42)
+
+    stack_raw_text, stack_raw_labels  = processor.read_data(os.path.join(opt.raw_data_dir, 'train.conll'))
+    stack_enhance_text, stack_enhance_labels = data_enhancement(os.path.join(opt.raw_data_dir, 'train.conll'))
+    
+    stack_raw_text += stack_enhance_text
+    stack_raw_labels += stack_enhance_labels
+
+    
+
+    base_output_dir = opt.output_dir
+
+    for i, (train_ids, dev_ids) in enumerate(kf.split(stack_raw_text)):
+        logger.info(f'Start to train the {i} fold')
+        
+        train_raw_text = [stack_raw_text[_idx] for _idx in train_ids]
+        train_raw_labels = [stack_raw_labels[_idx] for _idx in train_ids]
+        train_examples = processor.get_example(train_raw_text, train_raw_labels, 'train')
+
+        dev_raw_text = [stack_raw_text[_idx] for _idx in dev_ids]
+        dev_raw_labels = [stack_raw_labels[_idx] for _idx in dev_ids]
+        
+        dev_examples = processor.get_example(dev_raw_text, dev_raw_labels, 'dev')
+
+        tmp_output_dir = os.path.join(base_output_dir, f'v{i}')
+
+        opt.output_dir = tmp_output_dir
+
+        train_base(opt, train_examples, dev_examples)
+
 
 
 if __name__ == '__main__':
@@ -151,7 +193,7 @@ if __name__ == '__main__':
 
     args = Args().get_parser()
 
-    assert args.mode in ['train']
+    assert args.mode in ['train', 'stack'], 'mode mismatch'
     assert args.task_type in ['crf']
 
     
@@ -161,14 +203,22 @@ if __name__ == '__main__':
     args.output_dir = os.path.join(args.output_dir, args.bert_type)
     args.output_dir += f'_{args.task_type}' 
     args.output_dir += f'_{args.version}'
-
+    
+    
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir , exist_ok=True)
+    # else:
+    #     os.remove(args.output_dir)
+    #     os.makedirs(args.output_dir , exist_ok=True)
 
     logger.info(f'{args.mode} {args.task_type} in max_seq_len {args.max_seq_len}')
 
     if args.mode == 'train':
         training(args)
-
+    elif args.mode == 'stack':
+        stacking(args)
+        
+        
+    wandb.finish()
     time_dif = get_time_dif(start_time)
     logging.info("----------本次容器运行时长：{}-----------".format(time_dif))

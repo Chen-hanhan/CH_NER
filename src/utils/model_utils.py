@@ -7,7 +7,7 @@ from torchcrf import CRF
 from itertools import repeat
 from transformers import BertModel
 from src.utils.evaluator import crf_decode
-# from src.utils.functions_utils import vote
+from src.utils.functions_utils import vote
 # from src.utils.evaluator import crf_decode, span_decode
 
 
@@ -97,7 +97,73 @@ class CRFModel(BaseModel):
             out = (tokens_out, emissions)
         
         return out
+# 模型融合
+class EnsembleCRFModel:
+    def __init__(self, model_path_list, bert_dir_list, num_tags, device, lamb=1/3):
 
+        self.models = []
+        self.crf_module = CRF(num_tags=num_tags, batch_first=True)
+        self.lamb = lamb
+
+        for idx, _path in enumerate(model_path_list):
+            print(f'Load model from {_path}')
+            
+
+            print(f'Load model type: {bert_dir_list[0]}')
+            model = CRFModel(bert_dir=bert_dir_list[0], num_tags=num_tags)
+
+            
+            model.load_state_dict(torch.load(_path, map_location=torch.device('cpu')))
+
+            model.eval()
+            model.to(device)
+
+            self.models.append(model)
+            if idx == 0:
+                print(f'Load CRF weight from {_path}')
+                self.crf_module.load_state_dict(model.crf_module.state_dict())
+                self.crf_module.to(device)
+
+    def weight(self, t):
+        """
+        牛顿冷却定律加权融合
+        """
+        return math.exp(-self.lamb*t)# 返回x的指数,e^x
+
+    def predict(self, model_inputs):
+        weight_sum = 0.
+        logits = None
+        attention_masks = model_inputs['attention_masks']
+        
+        for idx, model in enumerate(self.models):
+            # 使用牛顿冷却概率融合
+            weight = self.weight(idx)
+
+            # 使用概率平均融合
+            # weight = 1 / len(self.models)
+
+            tmp_logits = model(**model_inputs)[1] * weight
+            weight_sum += weight
+            
+            if logits is None:
+                logits = tmp_logits
+            else:
+                logits += tmp_logits
+
+        logits = logits / weight_sum
+
+        tokens_out = self.crf_module.decode(emissions=logits, mask=attention_masks.byte())
+
+        return tokens_out
+
+    def vote_entities(self, model_inputs, sent, id2ent, threshold):
+        entities_ls = []
+        for idx, model in enumerate(self.models):
+            tmp_tokens = model(**model_inputs)[0][0]
+            tmp_entities = crf_decode(tmp_tokens, sent, id2ent)
+            entities_ls.append(tmp_entities)
+
+        return vote(entities_ls, threshold)
 
 def build_model(task_type, bert_dir, **kwargs):
     assert task_type in ['crf']

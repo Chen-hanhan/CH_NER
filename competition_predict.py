@@ -4,7 +4,7 @@ import torch
 from collections import defaultdict
 from transformers import BertTokenizer
 # from src.utils.model_utils import CRFModel, SpanModel, EnsembleCRFModel, EnsembleSpanModel
-from src.utils.model_utils import CRFModel
+from src.utils.model_utils import CRFModel, EnsembleCRFModel
 # from src.utils.evaluator import crf_decode, span_decode
 from src.utils.evaluator import crf_decode
 from src.utils.functions_utils import load_model_and_parallel, ensemble_vote
@@ -12,11 +12,11 @@ from src.preprocess.processor import fine_grade_tokenize
 
 MID_DATA_DIR = "./data/mid_data"
 RAW_DATA_DIR = "./data/raw_data"
-OUT_VERSION = 1
+OUT_VERSION = 6
 MODEL_DIR = f'./out/roberta_wwm_crf_{OUT_VERSION}' # 训练好的模型参数地址
 SUBMIT_DIR = os.path.join(MODEL_DIR, 'result')
 
-MAX_SEQ_LEN = 64
+MAX_SEQ_LEN = 512
 # SUBMIT_DIR = "./result"
 GPU_IDS = "0"
 
@@ -24,26 +24,28 @@ GPU_IDS = "0"
 
 TASK_TYPE = "crf"  # choose crf or span
 
-VERSION = "single"  # choose single or ensemble or mixed ; if mixed  VOTE and TAST_TYPE is useless.
+VERSION = "ensemble"  # choose single or ensemble or mixed ; if mixed  VOTE and TAST_TYPE is useless.
 
 # single_predict
 BERT_TYPE = "roberta_wwm"  # roberta_wwm / ernie_1 / uer_large
 
 BERT_DIR = f"./bert/torch_{BERT_TYPE}"
 
-VOTE = False  # choose True or False
+VOTE = True  # choose True or False
 LAMBDA = 0.3
 THRESHOLD = 0.9
 #TODO:按版本存放
-with open(os.path.join(MODEL_DIR, 'best_ckpt_path.txt'), 'r', encoding='utf-8') as f:
-    CKPT_PATH = f.read().strip()
-
-# ensemble_predict
-# BERT_DIR_LIST = ["./bert/torch_uer_large", "./bert/torch_roberta_wwm"]
-
-# with open('./best_ckpt_path.txt', 'r', encoding='utf-8') as f:
-#     ENSEMBLE_DIR_LIST = f.readlines()
-#     print('ENSEMBLE_DIR_LIST:{}'.format(ENSEMBLE_DIR_LIST))
+if VERSION == 'single':
+    with open(os.path.join(MODEL_DIR, 'best_ckpt_path.txt'), 'r', encoding='utf-8') as f:
+        CKPT_PATH = f.read().strip()
+elif VERSION == 'ensemble':
+    # ensemble_predict
+    BERT_DIR_LIST = ["./bert/torch_roberta_wwm"]
+    ENSEMBLE_DIR_LIST = []
+    for i in range(5):
+        with open(os.path.join(MODEL_DIR,f'v{i}/best_ckpt_path.txt'), 'r', encoding='utf-8') as f:
+            ENSEMBLE_DIR_LIST.append(f.readlines()[0].replace('\n', ''))
+            print('ENSEMBLE_DIR_LIST:{}'.format(ENSEMBLE_DIR_LIST))
 
 
 # # mixed_predict
@@ -227,7 +229,8 @@ def single_predict():
 
 
 def ensemble_predict():
-    save_dir = os.path.join(SUBMIT_DIR, VERSION)
+    # save_dir = os.path.join(SUBMIT_DIR, VERSION)
+    save_dir = f'{SUBMIT_DIR}-{VERSION}'
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
 
@@ -254,15 +257,13 @@ def ensemble_predict():
 
     labels = base_predict(model, device, info_dict, ensemble=True)
     
-
-    for key in labels.keys():
-        with open(os.path.join(save_dir, f'{key}.ann'), 'w', encoding='utf-8') as f:
-            if not len(labels[key]):
-                print(key)
-                f.write("")
-            else:
-                for idx, _label in enumerate(labels[key]):
-                    f.write(f'T{idx + 1}\t{_label[0]} {_label[1]} {_label[2]}\t{_label[3]}\n')
+    #TODO:存储标签
+    with open(os.path.join(save_dir, f'output_{OUT_VERSION}.txt'), 'w', encoding='utf-8') as f:
+        for _out in labels:
+            f.write(_out + '\r\n')
+            # f.write('\r\n')
+            # f.write('[2, 7, \'器官组织\', \'左手MCP\']	[19, 24, \'疾病\', \'轻度滑膜炎\']	属性' + '\r\n')
+            f.write('\r\n')
 
 def mixed_predict():
     save_dir = os.path.join(SUBMIT_DIR, VERSION)
@@ -325,19 +326,19 @@ if __name__ == '__main__':
         print("————————开始混合投票：————————")
         mixed_predict()
 
-    # 压缩result.zip
-    import zipfile
+    # # 压缩result.zip
+    # import zipfile
 
-    def zip_file(src_dir):
-        zip_name = src_dir + '.zip'
-        z = zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED)
-        for dirpath, dirnames, filenames in os.walk(src_dir):
-            fpath = dirpath.replace(src_dir, '')
-            fpath = fpath and fpath + os.sep or ''
-            for filename in filenames:
-                z.write(os.path.join(dirpath, filename), fpath + filename)
-        print('==压缩成功==')
-        z.close()
+    # def zip_file(src_dir):
+    #     zip_name = src_dir + '.zip'
+    #     z = zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED)
+    #     for dirpath, dirnames, filenames in os.walk(src_dir):
+    #         fpath = dirpath.replace(src_dir, '')
+    #         fpath = fpath and fpath + os.sep or ''
+    #         for filename in filenames:
+    #             z.write(os.path.join(dirpath, filename), fpath + filename)
+    print('==预测成功==')
+    #     z.close()
 
-    zip_file('./result')
+    # zip_file('./result')
 
