@@ -5,7 +5,7 @@ import logging
 from torch.cuda.amp import autocast as ac
 from torch.utils.data import DataLoader, RandomSampler
 from transformers import AdamW, get_linear_schedule_with_warmup
-# from src.utils.attack_train_utils import FGM, PGD
+from src.utils.attack_train_utils import FGM, PGD
 from src.utils.functions_utils import load_model_and_parallel, swa
 import wandb
 wandb.login()
@@ -96,6 +96,17 @@ def train(opt, model, train_dataset):
 
     model.zero_grad()
 
+    # attack_train
+    fgm, pgd = None, None
+
+    attack_train_mode = opt.attack_train.lower()
+    if attack_train_mode == 'fgm':
+        fgm = FGM(model=model)
+    elif attack_train_mode == 'pgd':
+        pgd = PGD(model=model)
+
+    pgd_k = 3
+    
     save_steps = t_total // opt.train_epochs
     eval_steps = save_steps
 
@@ -144,6 +155,53 @@ def train(opt, model, train_dataset):
             else:
                 loss.backward()
             
+            # acttack_train
+            if fgm is not None:
+                fgm.attack()
+
+                if opt.use_fp16:
+                    with ac():
+                        loss_adv = model(**batch_data)[0]
+                else:
+                    loss_adv = model(**batch_data)[0]
+
+                if use_n_gpus:
+                    loss_adv = loss_adv.mean()
+
+                if opt.use_fp16:
+                    scaler.scale(loss_adv).backward()
+                else:
+                    loss_adv.backward()
+
+                fgm.restore()
+                
+            elif pgd is not None:
+                pgd.backup_grad()
+
+                for _t in range(pgd_k):
+                    pgd.attack(is_first_attack=(_t == 0))
+
+                    if _t != pgd_k - 1:
+                        model.zero_grad()
+                    else:
+                        pgd.restore_grad()
+
+                    if opt.use_fp16:
+                        with ac():
+                            loss_adv = model(**batch_data)[0]
+                    else:
+                        loss_adv = model(**batch_data)[0]
+
+                    if use_n_gpus:
+                        loss_adv = loss_adv.mean()
+
+                    if opt.use_fp16:
+                        scaler.scale(loss_adv).backward()
+                    else:
+                        loss_adv.backward()
+
+                pgd.restore()
+            
             if opt.use_fp16:
                 scaler.unscale_(optimizer)
 
@@ -164,8 +222,8 @@ def train(opt, model, train_dataset):
             if global_step % log_loss_steps == 0:
                 avg_loss /= log_loss_steps
                 logger.info('Step: %d / %d ----> total loss: %.5f' % (global_step, t_total, avg_loss))
-                avg_loss = 0.
                 wandb.log({"avg_loss":avg_loss})
+                avg_loss = 0.
             else:
                 avg_loss += loss.item()
                 wandb.log({"loss":loss})

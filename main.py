@@ -80,8 +80,10 @@ def train_base(opt, train_examples, dev_examples):
 
             metric_str += f'In step {tmp_step}:\n {tmp_metric_str}' + '\n\n'
 
-            wandb.log({"f1":tmp_f1, 'precision': tmp_precision, 'recall': tmp_recall})
-            
+            # wandb.log({"f1":tmp_f1, 'precision': tmp_precision, 'recall': tmp_recall})
+            wandb.log({"f1":tmp_f1})
+            wandb.log({'precision': tmp_precision})
+            wandb.log({'recall': tmp_recall})
             if tmp_f1 > max_f1:
                 max_f1 = tmp_f1
                 max_f1_step = tmp_step
